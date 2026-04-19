@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Poignée -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="@color/md_theme_outline"
+        android:backgroundTint="?attr/colorOutline" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Personnalisation"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Mode sombre -->
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switch_dark_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Mode sombre"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Taille de police -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Taille de police" android:textStyle="bold" android:textColor="?attr/colorPrimary" />
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <SeekBar android:id="@+id/seekbar_font_size"
+            android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+        <TextView android:id="@+id/tv_font_size_label"
+            android:layout_width="48dp" android:layout_height="wrap_content"
+            android:text="20 sp" android:gravity="end" android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Interligne -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Interligne" android:textStyle="bold" android:textColor="?attr/colorPrimary"
+        android:layout_marginTop="12dp" />
+    <SeekBar android:id="@+id/seekbar_line_height"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+    <!-- Espacement lettres -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Espacement des lettres" android:textStyle="bold"
+        android:textColor="?attr/colorPrimary" android:layout_marginTop="12dp" />
+    <SeekBar android:id="@+id/seekbar_letter_spacing"
+        android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+    <!-- Aperçu -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Aperçu" android:textStyle="bold" android:textColor="?attr/colorPrimary"
+        android:layout_marginTop="16dp" />
+    <TextView
+        android:id="@+id/tv_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Aperçu du texte en\npolice OpenDyslexic"
+        android:padding="16dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_preview_rounded" />
+
+    <!-- Couleurs de fond -->
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="Couleur de fond" android:textStyle="bold"
+        android:textColor="?attr/colorPrimary" android:layout_marginTop="20dp"
+        android:layout_marginBottom="8dp" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chip_group_colors"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:singleSelection="true" />
+
+</LinearLayout>

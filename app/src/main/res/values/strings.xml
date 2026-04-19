@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DyslexiRead</string>
+
+    <!-- Accueil -->
+    <string name="btn_camera">Photographier un texte</string>
+    <string name="btn_camera_sub">Pointez sur n\'importe quel document</string>
+    <string name="btn_gallery">Image depuis la galerie</string>
+    <string name="btn_gallery_sub">Photo déjà prise</string>
+    <string name="btn_file">Ouvrir un document</string>
+    <string name="btn_file_sub">PDF, DOCX, TXT</string>
+    <string name="btn_manual">Coller du texte</string>
+    <string name="btn_manual_sub">Depuis le presse-papier ou à la main</string>
+    <string name="offline_notice">Toutes les fonctions sont disponibles hors-ligne</string>
+
+    <!-- Lecteur -->
+    <string name="no_text_loaded">Chargez un document pour commencer la lecture.</string>
+    <string name="export_pdf">Exporter en PDF</string>
+    <string name="open_on_device">📂 Ouvrir sur l\'appareil</string>
+    <string name="share">📤 Partager</string>
+
+    <!-- TTS -->
+    <string name="tts_playing">🔊 Lecture…</string>
+    <string name="tts_paused">⏸ Pause</string>
+    <string name="tts_stopped">🔇 Arrêt</string>
+    <string name="tts_error">⚠ Voix indisponible</string>
+    <string name="tts_lang_missing">Pack de langue manquant. Vérifiez les paramètres de synthèse vocale.</string>
+
+    <!-- Paramètres -->
+    <string name="settings_title">Personnalisation</string>
+    <string name="dark_mode">Mode sombre</string>
+    <string name="font_size">Taille de police</string>
+    <string name="line_height">Interligne</string>
+    <string name="letter_spacing">Espacement des lettres</string>
+    <string name="bg_color">Couleur de fond</string>
+    <string name="preview">Aperçu du texte en police OpenDyslexic</string>
+
+    <!-- Erreurs -->
+    <string name="error_ocr">Impossible de reconnaître le texte. Vérifiez la qualité de l\'image.</string>
+    <string name="error_file">Impossible d\'ouvrir ce fichier.</string>
+    <string name="error_export">Erreur lors de l\'export PDF.</string>
+    <string name="error_camera_permission">Permission caméra requise.</string>
+</resources>

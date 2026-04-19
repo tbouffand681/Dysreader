@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Photos prises par la caméra -->
+    <external-files-path
+        name="camera_images"
+        path="Pictures/" />
+
+    <!-- PDFs exportés -->
+    <files-path
+        name="exports"
+        path="exports/" />
+
+    <!-- Fichiers temporaires -->
+    <cache-path
+        name="cache"
+        path="." />
+</paths>

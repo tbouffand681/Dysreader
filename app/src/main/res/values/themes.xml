@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.DyslexiRead" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="android:fontFamily">@font/open_dyslexic</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!-- Thème de lancement (avant le premier frame) -->
+    <style name="Theme.DyslexiRead.Splash" parent="Theme.DyslexiRead">
+        <item name="android:windowBackground">@color/surface</item>
+    </style>
+
+</resources>

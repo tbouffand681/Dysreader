@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palette principale -->
+    <color name="primary">#2D7DD2</color>
+    <color name="primary_container">#D6E8FF</color>
+    <color name="on_primary_container">#00315F</color>
+    <color name="secondary">#E8A838</color>
+    <color name="secondary_container">#FFE0A3</color>
+    <color name="surface">#FFF8F0</color>
+    <color name="on_surface">#1A1A1A</color>
+    <color name="outline">#CCCCCC</color>
+    <color name="md_theme_outline">#CCCCCC</color>
+
+    <!-- Couleurs des boutons source (accueil) -->
+    <color name="color_camera">#2D7DD2</color>
+    <color name="color_gallery">#3BB78F</color>
+    <color name="color_file">#E8A838</color>
+    <color name="color_manual">#E06C75</color>
+
+    <!-- Fonds recommandés pour la dyslexie -->
+    <color name="bg_cream">#FFF8F0</color>
+    <color name="bg_yellow">#FFFDE7</color>
+    <color name="bg_green">#E8F5E9</color>
+    <color name="bg_blue">#E3F2FD</color>
+    <color name="bg_lavender">#F3E5F5</color>
+    <color name="bg_night">#1A1A2E</color>
+
+    <!-- Chip selector states -->
+    <color name="chip_selected">#2D7DD2</color>
+    <color name="chip_unselected">#F0F0F0</color>
+</resources>

@@ -14,11 +14,8 @@ dependencyResolutionManagement {
         // iText7
         maven { url = uri("https://repo.itextsupport.com/android") }
     }
-    versionCatalogs {
-        create("libs") {
-            from(files("gradle/libs.versions.toml"))
-        }
-    }
+    // Gradle 8+ charge automatiquement gradle/libs.versions.toml comme catalog "libs"
+    // Ne pas redéclarer versionCatalogs ici → évite "too_many_import_invocation"
 }
 
 rootProject.name = "DyslexiRead"

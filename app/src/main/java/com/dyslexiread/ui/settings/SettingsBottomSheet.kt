@@ -30,9 +30,7 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
     )
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         _binding = BottomSheetSettingsBinding.inflate(inflater, container, false)
         return binding.root
@@ -42,37 +40,38 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
         super.onViewCreated(view, savedInstanceState)
         val settings = viewModel.settings.value ?: return
 
-        // Taille de police
-        binding.seekbarFontSize.apply {
-            min = 14; max = 40
-            progress = settings.fontSize.toInt()
-            setOnSeekBarChangeListener(onSeekBar { viewModel.updateFontSize(it.toFloat()) })
-        }
+        // ── Taille de police (14–40 sp, offset de 14) ───────────────────────
+        // SeekBar.min requiert API 26 → on utilise un offset manuel pour API 24+
+        // progress 0 = 14sp, progress 26 = 40sp
+        val fontOffset = 14
+        binding.seekbarFontSize.max      = 26          // 40 - 14
+        binding.seekbarFontSize.progress = settings.fontSize.toInt() - fontOffset
+        binding.seekbarFontSize.setOnSeekBarChangeListener(onSeekBar { progress ->
+            viewModel.updateFontSize((progress + fontOffset).toFloat())
+        })
         updateFontSizeLabel(settings.fontSize.toInt())
 
-        // Interligne
-        binding.seekbarLineHeight.apply {
-            min = 0; max = 18
-            progress = ((settings.lineHeight - 1.2f) * 10).toInt()
-            setOnSeekBarChangeListener(onSeekBar { viewModel.updateLineHeight(it * 0.1f + 1.2f) })
-        }
+        // ── Interligne (1.2–3.0, offset×10) ─────────────────────────────────
+        binding.seekbarLineHeight.max      = 18         // (3.0 - 1.2) * 10
+        binding.seekbarLineHeight.progress = ((settings.lineHeight - 1.2f) * 10).toInt()
+        binding.seekbarLineHeight.setOnSeekBarChangeListener(onSeekBar { progress ->
+            viewModel.updateLineHeight(progress * 0.1f + 1.2f)
+        })
 
-        // Espacement lettres
-        binding.seekbarLetterSpacing.apply {
-            min = 0; max = 30
-            progress = (settings.letterSpacing * 100).toInt()
-            setOnSeekBarChangeListener(onSeekBar { viewModel.updateLetterSpacing(it * 0.01f) })
-        }
+        // ── Espacement lettres (0–0.30 em, ×100) ────────────────────────────
+        binding.seekbarLetterSpacing.max      = 30
+        binding.seekbarLetterSpacing.progress = (settings.letterSpacing * 100).toInt()
+        binding.seekbarLetterSpacing.setOnSeekBarChangeListener(onSeekBar { progress ->
+            viewModel.updateLetterSpacing(progress * 0.01f)
+        })
 
-        // Mode sombre
-        binding.switchDarkMode.apply {
-            isChecked = settings.darkMode
-            setOnCheckedChangeListener { _, _ -> viewModel.toggleDarkMode() }
-        }
+        // ── Mode sombre ──────────────────────────────────────────────────────
+        binding.switchDarkMode.isChecked = settings.darkMode
+        binding.switchDarkMode.setOnCheckedChangeListener { _, _ -> viewModel.toggleDarkMode() }
 
         setupColorChips()
 
-        // Aperçu en temps réel
+        // ── Aperçu en temps réel ─────────────────────────────────────────────
         viewModel.settings.observe(viewLifecycleOwner) { s ->
             updateFontSizeLabel(s.fontSize.toInt())
             binding.tvPreview.apply {
@@ -80,9 +79,10 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
                 setLineSpacing(0f, s.lineHeight)
                 letterSpacing = s.letterSpacing
                 setBackgroundColor(s.backgroundColor)
-                val tc = if (Color.luminance(s.backgroundColor) > 0.5f)
-                    Color.parseColor("#1A1A1A") else Color.WHITE
-                setTextColor(tc)
+                setTextColor(
+                    if (Color.luminance(s.backgroundColor) > 0.5f)
+                        Color.parseColor("#1A1A1A") else Color.WHITE
+                )
             }
         }
     }
@@ -94,9 +94,9 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
 
         bgPresets.forEach { (color, label) ->
             val chip = Chip(requireContext()).apply {
-                text = label
-                isCheckable = true
-                isChecked   = (color == currentColor)
+                text            = label
+                isCheckable     = true
+                isChecked       = (color == currentColor)
                 chipBackgroundColor = android.content.res.ColorStateList.valueOf(color)
                 setTextColor(
                     if (Color.luminance(color) > 0.5f) Color.BLACK else Color.WHITE

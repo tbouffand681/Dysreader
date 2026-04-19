@@ -2,6 +2,8 @@ package com.dyslexiread.ui.reader
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.Menu
@@ -30,10 +32,11 @@ class ReaderFragment : Fragment() {
     private var _binding: FragmentReaderBinding? = null
     private val binding get() = _binding!!
     private val viewModel: ReaderViewModel by activityViewModels()
-
     private lateinit var openDyslexicTypeface: Typeface
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentReaderBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -41,23 +44,23 @@ class ReaderFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Charger la police OpenDyslexic depuis les assets
         openDyslexicTypeface = Typeface.createFromAsset(
-            requireContext().assets,
-            "fonts/OpenDyslexic-Regular.ttf"
+            requireContext().assets, "fonts/OpenDyslexic-Regular.ttf"
         )
 
         setupMenu()
         setupTtsControls()
         observeViewModel()
 
-        // Si ouverture depuis une Intent externe (fichier partagé)
-        arguments?.getParcelable<android.net.Uri>("external_uri")?.let { uri ->
-            viewModel.loadFromDocumentUri(uri)
+        // Ouverture depuis une Intent externe — API 33+ vs API 24+
+        @Suppress("DEPRECATION")
+        val externalUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arguments?.getParcelable("external_uri", Uri::class.java)
+        } else {
+            arguments?.getParcelable("external_uri")
         }
+        externalUri?.let { viewModel.loadFromDocumentUri(it) }
     }
-
-    // ── Menu toolbar (réglages + export) ────────────────────────────────────
 
     private fun setupMenu() {
         (requireActivity() as MenuHost).addMenuProvider(object : MenuProvider {
@@ -70,43 +73,32 @@ class ReaderFragment : Fragment() {
                         SettingsBottomSheet().show(childFragmentManager, "settings")
                         true
                     }
-                    R.id.action_export -> {
-                        exportPdf()
-                        true
-                    }
+                    R.id.action_export -> { exportPdf(); true }
                     else -> false
                 }
             }
         }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
 
-    // ── Contrôles TTS ───────────────────────────────────────────────────────
-
     private fun setupTtsControls() {
         binding.btnPlay.setOnClickListener {
-            if (viewModel.ttsState.value == TtsService.State.PLAYING) {
-                viewModel.pauseTts()
-            } else {
-                viewModel.speakCurrentDocument()
-            }
+            if (viewModel.ttsState.value == TtsService.State.PLAYING) viewModel.pauseTts()
+            else viewModel.speakCurrentDocument()
         }
         binding.btnStop.setOnClickListener { viewModel.stopTts() }
-
         binding.chipFr.setOnClickListener { viewModel.updateTtsLanguage("fr-FR") }
         binding.chipEn.setOnClickListener { viewModel.updateTtsLanguage("en-US") }
         binding.chipIt.setOnClickListener { viewModel.updateTtsLanguage("it-IT") }
-
         binding.sliderSpeed.addOnChangeListener { _, value, _ -> viewModel.updateTtsSpeed(value) }
         binding.sliderPitch.addOnChangeListener { _, value, _ -> viewModel.updateTtsPitch(value) }
     }
 
-    // ── Observers ───────────────────────────────────────────────────────────
-
     private fun observeViewModel() {
         viewModel.document.observe(viewLifecycleOwner) { doc ->
             if (doc != null) {
-                applyTextToView(doc.text)
-                requireActivity().title = doc.label
+                binding.tvContent.typeface = openDyslexicTypeface
+                binding.tvContent.text     = doc.text
+                requireActivity().title    = doc.label
             } else {
                 binding.tvContent.text = getString(R.string.no_text_loaded)
             }
@@ -114,21 +106,19 @@ class ReaderFragment : Fragment() {
 
         viewModel.settings.observe(viewLifecycleOwner) { s ->
             binding.tvContent.apply {
-                textSize = s.fontSize
-                typeface = openDyslexicTypeface
+                textSize      = s.fontSize
+                typeface      = openDyslexicTypeface
                 setLineSpacing(0f, s.lineHeight)
                 letterSpacing = s.letterSpacing
             }
             binding.scrollView.setBackgroundColor(s.backgroundColor)
-            val textColor = if (Color.luminance(s.backgroundColor) > 0.5f)
-                Color.parseColor("#1A1A1A") else Color.WHITE
-            binding.tvContent.setTextColor(textColor)
-
-            // Langue TTS chips
+            binding.tvContent.setTextColor(
+                if (Color.luminance(s.backgroundColor) > 0.5f)
+                    Color.parseColor("#1A1A1A") else Color.WHITE
+            )
             binding.chipFr.isChecked = s.ttsLanguage == "fr-FR"
             binding.chipEn.isChecked = s.ttsLanguage == "en-US"
             binding.chipIt.isChecked = s.ttsLanguage == "it-IT"
-
             binding.sliderSpeed.value = s.ttsSpeed
             binding.sliderPitch.value = s.ttsPitch
         }
@@ -141,7 +131,6 @@ class ReaderFragment : Fragment() {
             err?.let { Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show() }
         }
 
-        // TTS state (StateFlow → coroutine)
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.ttsState.collect { state ->
@@ -160,15 +149,6 @@ class ReaderFragment : Fragment() {
         }
     }
 
-    private fun applyTextToView(text: String) {
-        binding.tvContent.apply {
-            typeface = openDyslexicTypeface
-            this.text = text
-        }
-    }
-
-    // ── Export PDF ──────────────────────────────────────────────────────────
-
     private fun exportPdf() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Exporter en PDF")
@@ -176,9 +156,9 @@ class ReaderFragment : Fragment() {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val bytes = viewModel.buildExportPdf() ?: return@launch
                     val label = viewModel.document.value?.label ?: "document"
-                    val file = viewModel.pdfExport.saveToFile(bytes, label)
+                    val file  = viewModel.pdfExport.saveToFile(bytes, label)
                     if (which == 0) viewModel.pdfExport.openFile(file)
-                    else viewModel.pdfExport.shareFile(file)
+                    else            viewModel.pdfExport.shareFile(file)
                 }
             }
             .show()

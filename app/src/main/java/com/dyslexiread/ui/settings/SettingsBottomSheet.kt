@@ -7,10 +7,11 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.SeekBar
 import androidx.fragment.app.activityViewModels
-import com.dyslexiread.R
 import com.dyslexiread.databinding.BottomSheetSettingsBinding
 import com.dyslexiread.ui.ReaderViewModel
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
 class SettingsBottomSheet : BottomSheetDialogFragment() {
 
@@ -18,18 +19,21 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
     private val binding get() = _binding!!
     private val viewModel: ReaderViewModel by activityViewModels()
 
-    // Palettes de fond optimisées pour la dyslexie
     private val bgPresets = listOf(
         Color.parseColor("#FFF8F0") to "Crème",
         Color.parseColor("#FFFDE7") to "Jaune doux",
         Color.parseColor("#E8F5E9") to "Vert doux",
         Color.parseColor("#E3F2FD") to "Bleu doux",
         Color.parseColor("#F3E5F5") to "Lavande",
-        Color.WHITE to "Blanc",
+        Color.WHITE                 to "Blanc",
         Color.parseColor("#1A1A2E") to "Nuit"
     )
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         _binding = BottomSheetSettingsBinding.inflate(inflater, container, false)
         return binding.root
     }
@@ -38,7 +42,7 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
         super.onViewCreated(view, savedInstanceState)
         val settings = viewModel.settings.value ?: return
 
-        // ── Taille de police ─────────────────────────────────────────────────
+        // Taille de police
         binding.seekbarFontSize.apply {
             min = 14; max = 40
             progress = settings.fontSize.toInt()
@@ -46,37 +50,33 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
         }
         updateFontSizeLabel(settings.fontSize.toInt())
 
-        // ── Interligne ───────────────────────────────────────────────────────
+        // Interligne
         binding.seekbarLineHeight.apply {
-            min = 0; max = 18 // 1.2 → 3.0 mappé sur 0→18 (×0.1 + 1.2)
+            min = 0; max = 18
             progress = ((settings.lineHeight - 1.2f) * 10).toInt()
-            setOnSeekBarChangeListener(onSeekBar {
-                val v = it * 0.1f + 1.2f
-                viewModel.updateLineHeight(v)
-            })
+            setOnSeekBarChangeListener(onSeekBar { viewModel.updateLineHeight(it * 0.1f + 1.2f) })
         }
 
-        // ── Espacement lettres ───────────────────────────────────────────────
+        // Espacement lettres
         binding.seekbarLetterSpacing.apply {
-            min = 0; max = 30 // 0→0.3 em mappé ×10
+            min = 0; max = 30
             progress = (settings.letterSpacing * 100).toInt()
             setOnSeekBarChangeListener(onSeekBar { viewModel.updateLetterSpacing(it * 0.01f) })
         }
 
-        // ── Mode sombre ──────────────────────────────────────────────────────
+        // Mode sombre
         binding.switchDarkMode.apply {
             isChecked = settings.darkMode
             setOnCheckedChangeListener { _, _ -> viewModel.toggleDarkMode() }
         }
 
-        // ── Couleurs de fond ─────────────────────────────────────────────────
         setupColorChips()
 
-        // ── Aperçu en temps réel ─────────────────────────────────────────────
+        // Aperçu en temps réel
         viewModel.settings.observe(viewLifecycleOwner) { s ->
             updateFontSizeLabel(s.fontSize.toInt())
             binding.tvPreview.apply {
-                textSize = s.fontSize
+                textSize      = s.fontSize
                 setLineSpacing(0f, s.lineHeight)
                 letterSpacing = s.letterSpacing
                 setBackgroundColor(s.backgroundColor)
@@ -88,15 +88,15 @@ class SettingsBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun setupColorChips() {
-        val chipGroup = binding.chipGroupColors
+        val chipGroup: ChipGroup = binding.chipGroupColors
         chipGroup.removeAllViews()
-
         val currentColor = viewModel.settings.value?.backgroundColor ?: Color.WHITE
+
         bgPresets.forEach { (color, label) ->
-            val chip = com.google.android.material.chip.Chip(requireContext()).apply {
+            val chip = Chip(requireContext()).apply {
                 text = label
                 isCheckable = true
-                isChecked = color == currentColor
+                isChecked   = (color == currentColor)
                 chipBackgroundColor = android.content.res.ColorStateList.valueOf(color)
                 setTextColor(
                     if (Color.luminance(color) > 0.5f) Color.BLACK else Color.WHITE

@@ -30,65 +30,56 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
     private val viewModel: ReaderViewModel by activityViewModels()
-
     private var cameraImageUri: Uri? = null
-
-    // ── Lanceurs d'activité ──────────────────────────────────────────────────
+    private var navigated = false
 
     private val cameraLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            cameraImageUri?.let {
-                viewModel.loadFromCameraUri(it)
-                observeAndNavigate()
-            }
+            cameraImageUri?.let { viewModel.loadFromCameraUri(it) }
         }
     }
 
     private val galleryLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            viewModel.loadFromGalleryUri(it)
-            observeAndNavigate()
-        }
-    }
+    ) { uri -> uri?.let { viewModel.loadFromGalleryUri(it) } }
 
     private val fileLauncher = registerForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            viewModel.loadFromDocumentUri(it)
-            observeAndNavigate()
-        }
-    }
+    ) { uri -> uri?.let { viewModel.loadFromDocumentUri(it) } }
 
-    // ────────────────────────────────────────────────────────────────────────────
-
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+    ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        navigated = false
 
         binding.btnCamera.setOnClickListener { launchCamera() }
         binding.btnGallery.setOnClickListener { galleryLauncher.launch("image/*") }
-        binding.btnFile.setOnClickListener {
-            fileLauncher.launch("*/*")  // filtré par Android sur pdf/docx
-        }
+        binding.btnFile.setOnClickListener { fileLauncher.launch("*/*") }
         binding.btnManual.setOnClickListener { showManualTextDialog() }
 
-        // Chargement
         viewModel.loading.observe(viewLifecycleOwner) { loading ->
-            binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
+            binding.progressBar.visibility   = if (loading) View.VISIBLE else View.GONE
             binding.loadingOverlay.visibility = if (loading) View.VISIBLE else View.GONE
         }
 
         viewModel.error.observe(viewLifecycleOwner) { err ->
             err?.let { Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show() }
+        }
+
+        // Navigation dès qu'un document est chargé
+        viewModel.document.observe(viewLifecycleOwner) { doc ->
+            if (doc != null && !navigated) {
+                navigated = true
+                findNavController().navigate(R.id.action_home_to_reader)
+            }
         }
     }
 
@@ -121,21 +112,10 @@ class HomeFragment : Fragment() {
             .setView(editText)
             .setPositiveButton("Lire") { _, _ ->
                 val text = editText.text.toString()
-                if (text.isNotBlank()) {
-                    viewModel.loadManualText(text)
-                    findNavController().navigate(R.id.action_home_to_reader)
-                }
+                if (text.isNotBlank()) viewModel.loadManualText(text)
             }
             .setNegativeButton("Annuler", null)
             .show()
-    }
-
-    private fun observeAndNavigate() {
-        viewModel.document.observe(viewLifecycleOwner) { doc ->
-            if (doc != null) {
-                findNavController().navigate(R.id.action_home_to_reader)
-            }
-        }
     }
 
     override fun onDestroyView() {

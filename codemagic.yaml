@@ -1,0 +1,190 @@
+workflows:
+
+  # ── Build DEBUG (Pull Requests / branches de dev) ──────────────────────────
+  android-debug:
+    name: Android Debug Build
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+
+    environment:
+      android_signing:
+        - dyslexiread_debug_keystore   # à configurer dans Codemagic > Teams > Code signing
+      vars:
+        PACKAGE_NAME: "com.dyslexiread.app"
+      java: 17
+
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: 'develop'
+          include: true
+        - pattern: 'feature/*'
+          include: true
+        - pattern: 'main'
+          include: false   # main → workflow release
+
+    scripts:
+      - name: Vérifier la structure du projet
+        script: |
+          ls -la
+          cat gradle/libs.versions.toml | grep "kotlin ="
+
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Télécharger les dépendances Gradle
+        script: |
+          ./gradlew dependencies --no-daemon
+
+      - name: Lint
+        script: |
+          ./gradlew lint --no-daemon
+        ignore_failure: true   # ne bloque pas le build en debug
+
+      - name: Tests unitaires
+        script: |
+          ./gradlew test --no-daemon
+        ignore_failure: true
+
+      - name: Assembler APK Debug
+        script: |
+          ./gradlew assembleDebug --no-daemon
+
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
+      - app/build/reports/lint-results-debug.html
+
+    publishing:
+      email:
+        recipients:
+          - dev@dyslexiread.com
+        notify:
+          success: true
+          failure: true
+
+  # ── Build RELEASE (tag Git → Play Store internal track) ───────────────────
+  android-release:
+    name: Android Release — Play Store
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    environment:
+      android_signing:
+        - dyslexiread_release_keystore  # Upload key Play Store
+      vars:
+        PACKAGE_NAME: "com.dyslexiread.app"
+      java: 17
+
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'          # ex : v1.0.0, v1.2.3
+          include: true
+
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Vérifier la version dans build.gradle.kts
+        script: |
+          grep "versionName\|versionCode" app/build.gradle.kts
+
+      - name: Lint (bloquant en release)
+        script: |
+          ./gradlew lint --no-daemon
+
+      - name: Tests unitaires
+        script: |
+          ./gradlew test --no-daemon
+
+      - name: Assembler APK Release signé
+        script: |
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Générer AAB (Android App Bundle) pour le Play Store
+        script: |
+          ./gradlew bundleRelease --no-daemon
+
+    artifacts:
+      - app/build/outputs/apk/release/*.apk
+      - app/build/outputs/bundle/release/*.aab
+      - app/build/reports/
+
+    publishing:
+      email:
+        recipients:
+          - dev@dyslexiread.com
+          - release@dyslexiread.com
+        notify:
+          success: true
+          failure: true
+
+      # Déploiement automatique sur le Play Store (internal testing track)
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS  # JSON à configurer dans Codemagic > Environment variables
+        track: internal          # internal → alpha → beta → production
+        submit_as_draft: false
+        changes_not_sent_for_review: false
+
+  # ── Build QA (branche main → Firebase App Distribution) ──────────────────
+  android-qa:
+    name: Android QA — Firebase Distribution
+    max_build_duration: 45
+    instance_type: mac_mini_m1
+
+    environment:
+      android_signing:
+        - dyslexiread_debug_keystore
+      vars:
+        PACKAGE_NAME: "com.dyslexiread.app"
+        FIREBASE_APP_ID: "1:xxxxxxxxxxxx:android:xxxxxxxxxxxxxxxx"  # à remplacer
+      java: 17
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+
+    scripts:
+      - name: Set up local.properties
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Tests unitaires
+        script: |
+          ./gradlew test --no-daemon
+
+      - name: Assembler APK Debug
+        script: |
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Distribuer via Firebase App Distribution
+        script: |
+          # Installer Firebase CLI
+          npm install -g firebase-tools
+
+          # Distribuer l'APK aux testeurs QA
+          firebase appdistribution:distribute \
+            app/build/outputs/apk/debug/app-debug.apk \
+            --app "$FIREBASE_APP_ID" \
+            --token "$FIREBASE_TOKEN" \
+            --groups "qa-testers" \
+            --release-notes "Build automatique depuis la branche main — $(date '+%Y-%m-%d %H:%M')"
+
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
+
+    publishing:
+      email:
+        recipients:
+          - qa@dyslexiread.com
+        notify:
+          success: true
+          failure: true

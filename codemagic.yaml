@@ -1,14 +1,13 @@
 workflows:
 
   # ── Build DEBUG (Pull Requests / branches de dev) ──────────────────────────
+  # Pas de keystore déclaré : Gradle utilise le debug.keystore auto-généré par Android SDK
   android-debug:
     name: Android Debug Build
     max_build_duration: 30
     instance_type: mac_mini_m1
 
     environment:
-      android_signing:
-        - dyslexiread_debug_keystore   # à configurer dans Codemagic > Teams > Code signing
       vars:
         PACKAGE_NAME: "com.dyslexiread.app"
       java: 17
@@ -23,7 +22,7 @@ workflows:
         - pattern: 'feature/*'
           include: true
         - pattern: 'main'
-          include: false   # main → workflow release
+          include: false
 
     scripts:
       - name: Vérifier la structure du projet
@@ -42,7 +41,7 @@ workflows:
       - name: Lint
         script: |
           ./gradlew lint --no-daemon
-        ignore_failure: true   # ne bloque pas le build en debug
+        ignore_failure: true
 
       - name: Tests unitaires
         script: |
@@ -66,14 +65,17 @@ workflows:
           failure: true
 
   # ── Build RELEASE (tag Git → Play Store internal track) ───────────────────
+  # Signature via variables d'environnement Codemagic (secrets) :
+  #   CM_KEYSTORE          : keystore encodé en base64
+  #   CM_KEY_ALIAS         : alias de la clé
+  #   CM_KEY_PASSWORD      : mot de passe de la clé
+  #   CM_KEYSTORE_PASSWORD : mot de passe du keystore
   android-release:
     name: Android Release — Play Store
     max_build_duration: 60
     instance_type: mac_mini_m1
 
     environment:
-      android_signing:
-        - dyslexiread_release_keystore  # Upload key Play Store
       vars:
         PACKAGE_NAME: "com.dyslexiread.app"
       java: 17
@@ -82,7 +84,7 @@ workflows:
       events:
         - tag
       tag_patterns:
-        - pattern: 'v*'          # ex : v1.0.0, v1.2.3
+        - pattern: 'v*'
           include: true
 
     scripts:
@@ -90,11 +92,17 @@ workflows:
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
-      - name: Vérifier la version dans build.gradle.kts
+      - name: Configurer la signature
         script: |
-          grep "versionName\|versionCode" app/build.gradle.kts
+          echo $CM_KEYSTORE | base64 --decode > /tmp/dyslexiread.jks
+          cat >> gradle.properties <<EOF
+          RELEASE_STORE_FILE=/tmp/dyslexiread.jks
+          RELEASE_KEY_ALIAS=$CM_KEY_ALIAS
+          RELEASE_KEY_PASSWORD=$CM_KEY_PASSWORD
+          RELEASE_STORE_PASSWORD=$CM_KEYSTORE_PASSWORD
+          EOF
 
-      - name: Lint (bloquant en release)
+      - name: Lint
         script: |
           ./gradlew lint --no-daemon
 
@@ -106,7 +114,7 @@ workflows:
         script: |
           ./gradlew assembleRelease --no-daemon
 
-      - name: Générer AAB (Android App Bundle) pour le Play Store
+      - name: Générer AAB pour le Play Store
         script: |
           ./gradlew bundleRelease --no-daemon
 
@@ -124,25 +132,26 @@ workflows:
           success: true
           failure: true
 
-      # Déploiement automatique sur le Play Store (internal testing track)
+      # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS : JSON du compte de service Google Play (secret Codemagic)
       google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS  # JSON à configurer dans Codemagic > Environment variables
-        track: internal          # internal → alpha → beta → production
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
         submit_as_draft: false
         changes_not_sent_for_review: false
 
   # ── Build QA (branche main → Firebase App Distribution) ──────────────────
+  # Pas de keystore : APK debug signé automatiquement
   android-qa:
     name: Android QA — Firebase Distribution
     max_build_duration: 45
     instance_type: mac_mini_m1
 
     environment:
-      android_signing:
-        - dyslexiread_debug_keystore
       vars:
         PACKAGE_NAME: "com.dyslexiread.app"
-        FIREBASE_APP_ID: "1:xxxxxxxxxxxx:android:xxxxxxxxxxxxxxxx"  # à remplacer
+        # Remplacer par votre Firebase App ID (console Firebase > Paramètres du projet)
+        FIREBASE_APP_ID: "1:xxxxxxxxxxxx:android:xxxxxxxxxxxxxxxx"
+        # FIREBASE_TOKEN : généré via `firebase login:ci` → variable secrète Codemagic
       java: 17
 
     triggering:
@@ -167,16 +176,13 @@ workflows:
 
       - name: Distribuer via Firebase App Distribution
         script: |
-          # Installer Firebase CLI
           npm install -g firebase-tools
-
-          # Distribuer l'APK aux testeurs QA
           firebase appdistribution:distribute \
             app/build/outputs/apk/debug/app-debug.apk \
             --app "$FIREBASE_APP_ID" \
             --token "$FIREBASE_TOKEN" \
             --groups "qa-testers" \
-            --release-notes "Build automatique depuis la branche main — $(date '+%Y-%m-%d %H:%M')"
+            --release-notes "Build auto — main — $(date '+%Y-%m-%d %H:%M')"
 
     artifacts:
       - app/build/outputs/apk/debug/*.apk

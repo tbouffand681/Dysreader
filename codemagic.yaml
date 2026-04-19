@@ -1,7 +1,6 @@
 workflows:
 
-  # ── Build DEBUG (Pull Requests / branches de dev) ──────────────────────────
-  # Pas de keystore déclaré : Gradle utilise le debug.keystore auto-généré par Android SDK
+  # ── Build DEBUG ─────────────────────────────────────────────────────────────
   android-debug:
     name: Android Debug Build
     max_build_duration: 30
@@ -28,28 +27,29 @@ workflows:
       - name: Vérifier la structure du projet
         script: |
           ls -la
-          cat gradle/libs.versions.toml | grep "kotlin ="
+          ls -la gradle/wrapper/
 
-      - name: Set up local.properties
+      - name: Set up + dépendances Gradle
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-
-      - name: Télécharger les dépendances Gradle
-        script: |
+          chmod +x gradlew
           ./gradlew dependencies --no-daemon
 
       - name: Lint
         script: |
+          chmod +x gradlew
           ./gradlew lint --no-daemon
         ignore_failure: true
 
       - name: Tests unitaires
         script: |
+          chmod +x gradlew
           ./gradlew test --no-daemon
         ignore_failure: true
 
       - name: Assembler APK Debug
         script: |
+          chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
     artifacts:
@@ -64,12 +64,7 @@ workflows:
           success: true
           failure: true
 
-  # ── Build RELEASE (tag Git → Play Store internal track) ───────────────────
-  # Signature via variables d'environnement Codemagic (secrets) :
-  #   CM_KEYSTORE          : keystore encodé en base64
-  #   CM_KEY_ALIAS         : alias de la clé
-  #   CM_KEY_PASSWORD      : mot de passe de la clé
-  #   CM_KEYSTORE_PASSWORD : mot de passe du keystore
+  # ── Build RELEASE ───────────────────────────────────────────────────────────
   android-release:
     name: Android Release — Play Store
     max_build_duration: 60
@@ -104,18 +99,22 @@ workflows:
 
       - name: Lint
         script: |
+          chmod +x gradlew
           ./gradlew lint --no-daemon
 
       - name: Tests unitaires
         script: |
+          chmod +x gradlew
           ./gradlew test --no-daemon
 
       - name: Assembler APK Release signé
         script: |
+          chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
       - name: Générer AAB pour le Play Store
         script: |
+          chmod +x gradlew
           ./gradlew bundleRelease --no-daemon
 
     artifacts:
@@ -132,15 +131,13 @@ workflows:
           success: true
           failure: true
 
-      # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS : JSON du compte de service Google Play (secret Codemagic)
       google_play:
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
         track: internal
         submit_as_draft: false
         changes_not_sent_for_review: false
 
-  # ── Build QA (branche main → Firebase App Distribution) ──────────────────
-  # Pas de keystore : APK debug signé automatiquement
+  # ── Build QA ────────────────────────────────────────────────────────────────
   android-qa:
     name: Android QA — Firebase Distribution
     max_build_duration: 45
@@ -149,9 +146,7 @@ workflows:
     environment:
       vars:
         PACKAGE_NAME: "com.dyslexiread.app"
-        # Remplacer par votre Firebase App ID (console Firebase > Paramètres du projet)
         FIREBASE_APP_ID: "1:xxxxxxxxxxxx:android:xxxxxxxxxxxxxxxx"
-        # FIREBASE_TOKEN : généré via `firebase login:ci` → variable secrète Codemagic
       java: 17
 
     triggering:
@@ -162,16 +157,11 @@ workflows:
           include: true
 
     scripts:
-      - name: Set up local.properties
+      - name: Set up + Tests + APK
         script: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-
-      - name: Tests unitaires
-        script: |
+          chmod +x gradlew
           ./gradlew test --no-daemon
-
-      - name: Assembler APK Debug
-        script: |
           ./gradlew assembleDebug --no-daemon
 
       - name: Distribuer via Firebase App Distribution

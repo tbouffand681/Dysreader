@@ -1,17 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Déclarez ici la famille de polices OpenDyslexic.
-    Les fichiers .ttf doivent être placés dans res/font/ :
-      - res/font/open_dyslexic.ttf         (Regular)
-      - res/font/open_dyslexic_bold.ttf    (Bold)
-      - res/font/open_dyslexic_italic.ttf  (Italic)
-
-    Téléchargement gratuit : https://opendyslexic.org
-    Licence : SIL Open Font License 1.1
+    Un seul fichier requis : res/font/open_dyslexic.ttf
+    Bold et Italic pointent sur le même fichier Regular — Android les simulera.
+    Ajoutez open_dyslexic_bold.ttf et open_dyslexic_italic.ttf plus tard si besoin.
 -->
 <font-family xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
+ 
     <font
         android:font="@font/open_dyslexic"
         android:fontStyle="normal"
@@ -19,21 +14,21 @@
         app:font="@font/open_dyslexic"
         app:fontStyle="normal"
         app:fontWeight="400" />
-
+ 
     <font
-        android:font="@font/open_dyslexic_bold"
+        android:font="@font/open_dyslexic"
         android:fontStyle="normal"
         android:fontWeight="700"
-        app:font="@font/open_dyslexic_bold"
+        app:font="@font/open_dyslexic"
         app:fontStyle="normal"
         app:fontWeight="700" />
-
+ 
     <font
-        android:font="@font/open_dyslexic_italic"
+        android:font="@font/open_dyslexic"
         android:fontStyle="italic"
         android:fontWeight="400"
-        app:font="@font/open_dyslexic_italic"
+        app:font="@font/open_dyslexic"
         app:fontStyle="italic"
         app:fontWeight="400" />
-
+ 
 </font-family>

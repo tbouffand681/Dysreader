@@ -1,17 +1,15 @@
 package com.dyslexiread.ui.home
 
-import android.app.Activity
-import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -30,24 +28,37 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
     private val viewModel: ReaderViewModel by activityViewModels()
-    private var cameraImageUri: Uri? = null
+
+    private var pendingPhotoUri: Uri? = null
     private var navigated = false
 
-    private val cameraLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            cameraImageUri?.let { viewModel.loadFromCameraUri(it) }
+    // ── Demande de permission caméra ─────────────────────────────────────────
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            openCamera()
+        } else {
+            Snackbar.make(
+                binding.root,
+                "Permission caméra refusée. Autorisez-la dans Paramètres > Applications > DyslexiRead.",
+                Snackbar.LENGTH_LONG
+            ).show()
         }
     }
 
-    private val galleryLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { viewModel.loadFromGalleryUri(it) } }
-
-    private val fileLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri -> uri?.let { viewModel.loadFromDocumentUri(it) } }
+    // ── Capture photo ────────────────────────────────────────────────────────
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val uri = pendingPhotoUri ?: return@registerForActivityResult
+            showLoading(true, "Analyse de l'image…")
+            viewModel.loadFromCameraUri(uri)
+        } else {
+            Snackbar.make(binding.root, "Photo annulée.", Snackbar.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -60,62 +71,92 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         navigated = false
 
-        binding.btnCamera.setOnClickListener { launchCamera() }
-        binding.btnGallery.setOnClickListener { galleryLauncher.launch("image/*") }
-        binding.btnFile.setOnClickListener { fileLauncher.launch("*/*") }
-        binding.btnManual.setOnClickListener { showManualTextDialog() }
+        // Seul bouton actif pour l'instant
+        binding.btnCamera.setOnClickListener { checkCameraPermissionAndOpen() }
 
+        // Observer chargement
         viewModel.loading.observe(viewLifecycleOwner) { loading ->
-            binding.progressBar.visibility   = if (loading) View.VISIBLE else View.GONE
-            binding.loadingOverlay.visibility = if (loading) View.VISIBLE else View.GONE
+            showLoading(loading, "Analyse en cours…")
         }
 
+        // Observer erreurs
         viewModel.error.observe(viewLifecycleOwner) { err ->
-            err?.let { Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show() }
+            err?.let {
+                showLoading(false)
+                Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+            }
         }
 
-        // Navigation dès qu'un document est chargé
+        // Navigation vers le lecteur dès qu'un document est prêt
         viewModel.document.observe(viewLifecycleOwner) { doc ->
             if (doc != null && !navigated) {
                 navigated = true
+                showLoading(false)
                 findNavController().navigate(R.id.action_home_to_reader)
             }
         }
     }
 
-    private fun launchCamera() {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val photoFile = File(
-            requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES),
-            "DyslexiRead_$timestamp.jpg"
-        )
-        cameraImageUri = FileProvider.getUriForFile(
-            requireContext(),
-            "${requireContext().packageName}.provider",
-            photoFile
-        )
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-            putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri)
+    // ── Gestion permission ───────────────────────────────────────────────────
+
+    private fun checkCameraPermissionAndOpen() {
+        when {
+            ContextCompat.checkSelfPermission(
+                requireContext(), Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                openCamera()
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
+                Snackbar.make(
+                    binding.root,
+                    "La caméra est nécessaire pour photographier un texte.",
+                    Snackbar.LENGTH_LONG
+                ).setAction("Autoriser") {
+                    requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }.show()
+            }
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
         }
-        cameraLauncher.launch(intent)
     }
 
-    private fun showManualTextDialog() {
-        val editText = EditText(requireContext()).apply {
-            hint = "Collez ou tapez votre texte ici…"
-            minLines = 5
-            maxLines = 12
-            setPadding(48, 32, 48, 32)
+    // ── Ouvrir caméra ────────────────────────────────────────────────────────
+
+    private fun openCamera() {
+        try {
+            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val storageDir = requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+                ?: requireContext().filesDir  // fallback si stockage externe indisponible
+
+            val photoFile = File.createTempFile(
+                "DyslexiRead_${timestamp}_", ".jpg", storageDir
+            )
+
+            val uri = FileProvider.getUriForFile(
+                requireContext(),
+                "${requireContext().packageName}.provider",
+                photoFile
+            )
+
+            pendingPhotoUri = uri
+            cameraLauncher.launch(uri)
+
+        } catch (e: Exception) {
+            Snackbar.make(
+                binding.root,
+                "Impossible d'ouvrir la caméra : ${e.localizedMessage}",
+                Snackbar.LENGTH_LONG
+            ).show()
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle("Saisir du texte")
-            .setView(editText)
-            .setPositiveButton("Lire") { _, _ ->
-                val text = editText.text.toString()
-                if (text.isNotBlank()) viewModel.loadManualText(text)
-            }
-            .setNegativeButton("Annuler", null)
-            .show()
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private fun showLoading(show: Boolean, message: String = "") {
+        binding.progressBar.visibility    = if (show) View.VISIBLE else View.GONE
+        binding.loadingOverlay.visibility = if (show) View.VISIBLE else View.GONE
+        if (message.isNotEmpty()) binding.tvLoadingMessage.text = message
     }
 
     override fun onDestroyView() {

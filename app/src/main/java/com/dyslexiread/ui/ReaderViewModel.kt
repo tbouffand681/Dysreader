@@ -2,6 +2,7 @@ package com.dyslexiread.ui
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -13,7 +14,9 @@ import com.dyslexiread.services.DocumentService
 import com.dyslexiread.services.OcrService
 import com.dyslexiread.services.PdfExportService
 import com.dyslexiread.services.TtsService
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ReaderViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -36,23 +39,34 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     val ttsState = tts.state
 
-    fun loadFromCameraUri(uri: Uri) = launchSafe {
-        val text = ocr.extractTextFromUri(uri)
+    // ── OCR depuis URI caméra / galerie ───────────────────────────────────────
+
+    fun loadFromCameraUri(uri: Uri) = launchSafe("loadFromCameraUri") {
+        Log.d("ReaderViewModel", "loadFromCameraUri: $uri")
+        // S'assurer qu'on est bien sur IO pour la lecture fichier
+        val text = withContext(Dispatchers.IO) {
+            ocr.extractTextFromUri(uri)
+        }
+        Log.d("ReaderViewModel", "Texte extrait (${text.length} chars)")
         _document.postValue(LoadedDocument(text, "Photo", SourceType.CAMERA))
     }
 
-    fun loadFromGalleryUri(uri: Uri) = launchSafe {
-        val text = ocr.extractTextFromUri(uri)
+    fun loadFromGalleryUri(uri: Uri) = launchSafe("loadFromGalleryUri") {
+        val text = withContext(Dispatchers.IO) {
+            ocr.extractTextFromUri(uri)
+        }
         _document.postValue(LoadedDocument(text, "Galerie", SourceType.GALLERY))
     }
 
-    fun loadFromDocumentUri(uri: Uri) = launchSafe {
-        val text = docs.extractText(uri)
+    fun loadFromDocumentUri(uri: Uri) = launchSafe("loadFromDocumentUri") {
+        val text = withContext(Dispatchers.IO) {
+            docs.extractText(uri)
+        }
         val name = docs.getFileName(uri)
         val type = when {
-            name.endsWith(".pdf", ignoreCase = true)  -> SourceType.PDF
+            name.endsWith(".pdf",  ignoreCase = true) -> SourceType.PDF
             name.endsWith(".docx", ignoreCase = true) ||
-            name.endsWith(".doc", ignoreCase = true)  -> SourceType.DOCX
+            name.endsWith(".doc",  ignoreCase = true) -> SourceType.DOCX
             else                                       -> SourceType.TXT
         }
         _document.postValue(LoadedDocument(text, name, type))
@@ -61,6 +75,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     fun loadManualText(text: String) {
         _document.value = LoadedDocument(text, "Texte libre", SourceType.MANUAL)
     }
+
+    // ── Paramètres ────────────────────────────────────────────────────────────
 
     fun updateFontSize(sp: Float)       = updateSettings { copy(fontSize = sp.coerceIn(14f, 40f)) }
     fun updateLineHeight(v: Float)      = updateSettings { copy(lineHeight = v.coerceIn(1.2f, 3f)) }
@@ -75,6 +91,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         _settings.value = _settings.value?.transform()
     }
 
+    // ── Audio ─────────────────────────────────────────────────────────────────
+
     fun speakCurrentDocument() {
         val doc = _document.value ?: return
         val s   = _settings.value  ?: return
@@ -83,6 +101,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
 
     fun pauseTts() = tts.pause()
     fun stopTts()  = tts.stop()
+
+    // ── Export PDF ────────────────────────────────────────────────────────────
 
     suspend fun buildExportPdf(): ByteArray? {
         val doc = _document.value ?: return null
@@ -96,14 +116,25 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    private fun launchSafe(block: suspend () -> Unit) {
+    // ── Helper coroutine ──────────────────────────────────────────────────────
+
+    private fun launchSafe(tag: String = "", block: suspend () -> Unit) {
         viewModelScope.launch {
             _loading.value = true
             _error.value   = null
             try {
                 block()
             } catch (e: Exception) {
-                _error.postValue(e.localizedMessage ?: "Erreur inconnue")
+                Log.e("ReaderViewModel", "Erreur dans $tag", e)
+                val msg = when {
+                    e.message?.contains("No such file") == true ->
+                        "Fichier image introuvable. Réessayez."
+                    e.message?.contains("decode") == true ->
+                        "Impossible de lire l'image. Format non supporté."
+                    else ->
+                        "Erreur : ${e.localizedMessage ?: e.javaClass.simpleName}"
+                }
+                _error.postValue(msg)
             } finally {
                 _loading.postValue(false)
             }

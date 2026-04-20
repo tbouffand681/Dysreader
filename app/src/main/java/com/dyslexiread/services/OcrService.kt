@@ -1,65 +1,66 @@
 package com.dyslexiread.services
 
-import android.graphics.Bitmap
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.content.Context
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.io.InputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/**
- * Service OCR hors-ligne via ML Kit (script Latin → FR, EN, IT).
- * Retourne le texte structuré bloc par bloc.
- */
 class OcrService(private val context: Context) {
 
-    // Instance unique du recognizer (à fermer quand plus utilisé)
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-    /**
-     * Extrait le texte depuis un URI (photo caméra ou galerie).
-     */
     suspend fun extractTextFromUri(uri: Uri): String {
-        val inputImage = InputImage.fromFilePath(context, uri)
-        return processImage(inputImage)
-    }
+        Log.d("OcrService", "extractTextFromUri: $uri")
 
-    /**
-     * Extrait le texte depuis un Bitmap (frame caméra live, etc.)
-     */
-    suspend fun extractTextFromBitmap(bitmap: Bitmap): String {
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
-        return processImage(inputImage)
-    }
+        // ── Méthode 1 : InputImage.fromFilePath (recommandée) ─────────────────
+        return try {
+            val inputImage = InputImage.fromFilePath(context, uri)
+            Log.d("OcrService", "InputImage créé depuis filePath OK")
+            processImage(inputImage)
+        } catch (e1: Exception) {
+            Log.w("OcrService", "fromFilePath échoué (${e1.message}), tentative via InputStream…")
 
-    /**
-     * Extrait le texte depuis un InputStream (image intégrée dans un fichier).
-     */
-    suspend fun extractTextFromStream(stream: InputStream): String {
-        val bitmap = BitmapFactory.decodeStream(stream)
-            ?: throw IllegalArgumentException("Impossible de décoder l'image")
-        return extractTextFromBitmap(bitmap)
+            // ── Méthode 2 : fallback via InputStream + BitmapFactory ──────────
+            try {
+                val stream = context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalStateException("ContentResolver ne peut pas ouvrir l'URI : $uri")
+
+                val bitmap = stream.use { BitmapFactory.decodeStream(it) }
+                    ?: throw IllegalStateException("BitmapFactory n'a pas pu décoder l'image")
+
+                Log.d("OcrService", "Bitmap décodé OK (${bitmap.width}×${bitmap.height})")
+                val inputImage = InputImage.fromBitmap(bitmap, 0)
+                processImage(inputImage)
+            } catch (e2: Exception) {
+                Log.e("OcrService", "Les deux méthodes ont échoué", e2)
+                throw Exception("Impossible de lire l'image : ${e2.localizedMessage}", e2)
+            }
+        }
     }
 
     private suspend fun processImage(image: InputImage): String =
         suspendCancellableCoroutine { cont ->
             recognizer.process(image)
                 .addOnSuccessListener { result ->
+                    Log.d("OcrService", "OCR OK — ${result.textBlocks.size} blocs détectés")
                     val sb = StringBuilder()
                     for (block in result.textBlocks) {
                         for (line in block.lines) {
                             sb.appendLine(line.text)
                         }
-                        sb.appendLine() // saut entre blocs = paragraphe
+                        sb.appendLine()
                     }
-                    cont.resume(sb.toString().trim())
+                    val text = sb.toString().trim()
+                    cont.resume(if (text.isEmpty()) "(Aucun texte détecté)" else text)
                 }
                 .addOnFailureListener { e ->
+                    Log.e("OcrService", "OCR échoué", e)
                     cont.resumeWithException(e)
                 }
         }

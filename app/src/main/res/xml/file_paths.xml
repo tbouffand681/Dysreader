@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Photos prises par la caméra -->
+    <!-- Photos prises par la caméra via getExternalFilesDir(Pictures) -->
     <external-files-path
-        name="camera_images"
+        name="camera_pictures"
         path="Pictures/" />
+
+    <!-- Fallback : si stockage externe indisponible, on utilise filesDir -->
+    <files-path
+        name="camera_internal"
+        path="." />
 
     <!-- PDFs exportés -->
     <files-path
         name="exports"
         path="exports/" />
 
-    <!-- Fichiers temporaires -->
+    <!-- Cache temporaire -->
     <cache-path
         name="cache"
+        path="." />
+
+    <!-- Stockage externe racine (certains appareils) -->
+    <external-path
+        name="external_root"
         path="." />
 </paths>
